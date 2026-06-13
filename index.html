@@ -321,7 +321,7 @@ function showError(msg){
 async function loadModels(){
   try{
     await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-    await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL);
     modelsReady = true;
     statusText.textContent = 'Model ready — tap start';
@@ -370,7 +370,7 @@ async function detectLoop(){
 
   const detections = await faceapi
     .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
-    .withFaceLandmarks(true)
+    .withFaceLandmarks()
     .withAgeAndGender();
 
   ctx.clearRect(0,0,overlay.width, overlay.height);
@@ -386,6 +386,7 @@ async function detectLoop(){
     ageVal.textContent = '—';
     confVal.textContent = '—';
     confBar.style.width = '0%';
+    statusText.textContent = 'Scanning…';
   } else {
     // Use the largest face (closest to camera) for the readout
     let best = detections[0];
@@ -421,19 +422,26 @@ async function detectLoop(){
             if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
           });
           ctx.closePath();
-          ctx.strokeStyle = '#39ff7a';
           ctx.lineWidth = 2;
+          ctx.strokeStyle = '#39ff7a';
           ctx.stroke();
-          ctx.fillStyle = 'rgba(57,255,122,0.18)';
+          ctx.fillStyle = 'rgba(57,255,122,0.25)';
           ctx.fill();
 
-          // iris marker at eye center
+          // iris marker — bright glowing dot at eye center
           const cx = eye.reduce((s,p)=>s+p.x,0) / eye.length * scaleX;
           const cy = eye.reduce((s,p)=>s+p.y,0) / eye.length * scaleY;
+          const eyeWidth = (eye[3].x - eye[0].x) * scaleX; // outer corners
+          const irisR = Math.max(4, eyeWidth * 0.18);
+
+          ctx.save();
+          ctx.shadowColor = '#39ff7a';
+          ctx.shadowBlur = 12;
           ctx.beginPath();
-          ctx.arc(cx, cy, 3, 0, Math.PI*2);
+          ctx.arc(cx, cy, irisR, 0, Math.PI*2);
           ctx.fillStyle = '#39ff7a';
           ctx.fill();
+          ctx.restore();
         });
       }
     });
@@ -446,6 +454,8 @@ async function detectLoop(){
     confVal.textContent = conf + '%';
     confBar.className = isChild ? 'child' : '';
     confBar.style.width = conf + '%';
+
+    statusText.textContent = best.landmarks ? 'Scanning… eyes locked' : 'Scanning… no landmarks';
   }
 
   requestAnimationFrame(detectLoop);
